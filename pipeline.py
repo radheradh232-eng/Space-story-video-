@@ -21,7 +21,7 @@ OUT.mkdir(exist_ok=True)
 HISTORY = ROOT / "docs" / "history.json"
 
 GEMINI_KEY = os.environ["GEMINI_API_KEY"]
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
 VOICE = os.environ.get("TTS_VOICE", "en-US-GuyNeural")
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
 
