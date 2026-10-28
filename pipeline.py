@@ -5,6 +5,7 @@ import os
 import random
 import subprocess
 import sys
+import time
 import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,7 +62,14 @@ Return ONLY JSON with keys:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"responseMimeType": "application/json"},
     }
-    r = requests.post(url, json=body, timeout=90)
+    r = None
+    for attempt in range(5):
+        r = requests.post(url, json=body, timeout=90)
+        if r.status_code in (429, 500, 503):
+            print(f"Gemini busy ({r.status_code}), retry {attempt + 1}/5...")
+            time.sleep(15 * (attempt + 1))
+            continue
+        break
     if not r.ok:
         print("GEMINI ERROR:", r.status_code, r.text)
     r.raise_for_status()
