@@ -62,7 +62,7 @@ Return ONLY JSON with keys:
         "generationConfig": {"responseMimeType": "application/json"},
     }
     r = requests.post(url, json=body, timeout=90)
-if not r.ok:
+    if not r.ok:
         print("GEMINI ERROR:", r.status_code, r.text)
     r.raise_for_status()
     text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
