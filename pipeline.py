@@ -54,37 +54,43 @@ Return ONLY JSON with keys:
   "image_prompt": a vivid detailed prompt for a vertical cinematic space image, no text or letters in it,
   "description": 2-3 sentence YouTube description,
   "tags": list of 10 relevant keyword tags (no # sign)."""
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-        f"?key={GEMINI_KEY}"
-    )
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"responseMimeType": "application/json"},
     }
-    r = None
+    # Pehla model fail/slow ho to agle model par chale jao.
+    models = list(dict.fromkeys([GEMINI_MODEL, "gemini-3.8-flash", "gemini-3.5-flash-lite"]))
     last_err = None
-    for attempt in range(5):
-        r = None
-        try:
-            r = requests.post(url, json=body, timeout=180)
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-            last_err = e
-            print(f"Gemini timeout/connection error ({e.__class__.__name__}), retry {attempt + 1}/5...")
-            time.sleep(10 * (attempt + 1))
-            continue
-        if r.status_code in (429, 500, 503):
-            print(f"Gemini busy ({r.status_code}), retry {attempt + 1}/5...")
-            time.sleep(15 * (attempt + 1))
-            continue
-        break
-    if r is None:
-        raise last_err
-    if not r.ok:
-        print("GEMINI ERROR:", r.status_code, r.text)
-    r.raise_for_status()
-    text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return json.loads(text)
+    for model in models:
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            f"?key={GEMINI_KEY}"
+        )
+        for attempt in range(3):
+            try:
+                r = requests.post(url, json=body, timeout=60)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                last_err = e
+                print(f"Gemini {model} timeout/connection error ({e.__class__.__name__}), try {attempt + 1}/3...")
+                time.sleep(5 * (attempt + 1))
+                continue
+            if r.status_code in (429, 500, 503):
+                last_err = RuntimeError(f"{model} returned {r.status_code}")
+                print(f"Gemini {model} busy ({r.status_code}), try {attempt + 1}/3...")
+                time.sleep(10 * (attempt + 1))
+                continue
+            if not r.ok:
+                last_err = RuntimeError(f"{model} returned {r.status_code}")
+                print("GEMINI ERROR:", model, r.status_code, r.text)
+                break  # is model se kaam nahi banega, agla model try karo
+            try:
+                text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(text)
+            except (KeyError, IndexError, ValueError) as e:
+                last_err = e
+                print(f"Gemini {model} bad response ({e!r}), try {attempt + 1}/3...")
+        print(f"Model {model} fail hua, agla model try kar raha hu...")
+    raise RuntimeError(f"Saare Gemini models fail hue: {last_err}")
 
 
 def make_image(prompt, path):
