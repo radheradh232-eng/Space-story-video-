@@ -95,16 +95,25 @@ Return ONLY JSON with keys:
 
 def make_image(prompt, path):
     full = prompt + ", ultra detailed, cinematic lighting, vertical 9:16 composition, no text"
-    url = (
-        "https://image.pollinations.ai/prompt/" + urllib.parse.quote(full)
-        + f"?width=1080&height=1920&nologo=true&seed={random.randint(1, 10**6)}"
-    )
-    for attempt in range(3):
-        r = requests.get(url, timeout=180)
-        if r.ok and r.headers.get("content-type", "").startswith("image"):
-            path.write_bytes(r.content)
-            return
-    raise RuntimeError("Image generate nahi hui")
+    # Free server kabhi busy hota hai: har koshish me naya seed, aur size chhota karte jao.
+    sizes = [(1080, 1920), (1080, 1920), (720, 1280), (720, 1280), (540, 960), (540, 960)]
+    for attempt, (w, h) in enumerate(sizes, 1):
+        url = (
+            "https://image.pollinations.ai/prompt/" + urllib.parse.quote(full)
+            + f"?width={w}&height={h}&nologo=true&seed={random.randint(1, 10**6)}"
+        )
+        try:
+            r = requests.get(url, timeout=90)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            print(f"Image try {attempt}/{len(sizes)} ({w}x{h}): {e.__class__.__name__}")
+        else:
+            ctype = r.headers.get("content-type", "")
+            if r.ok and ctype.startswith("image"):
+                path.write_bytes(r.content)
+                return
+            print(f"Image try {attempt}/{len(sizes)} ({w}x{h}): HTTP {r.status_code}, type={ctype}, body={r.text[:150]!r}")
+        time.sleep(10 * attempt)
+    raise RuntimeError("Image generate nahi hui (6 koshish ke baad)")
 
 
 async def make_voice(text, path):
