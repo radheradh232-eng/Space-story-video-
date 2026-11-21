@@ -137,6 +137,37 @@ def make_video(image, voice, hook, path):
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def check_yt_secrets():
+    """Upload se pehle 3 YouTube secrets ka format check. Values kabhi print nahi hoti."""
+    cid = os.environ.get("YT_CLIENT_ID", "").strip()
+    sec = os.environ.get("YT_CLIENT_SECRET", "").strip()
+    tok = os.environ.get("YT_REFRESH_TOKEN", "").strip()
+    errors, warns = [], []
+    if not cid:
+        errors.append("YT_CLIENT_ID khaali hai (GitHub secret set nahi hai)")
+    elif cid.startswith("GOCSPX-"):
+        errors.append("YT_CLIENT_ID me Client SECRET daal diya hai. ID aur Secret ulte ho gaye")
+    elif not cid.endswith(".apps.googleusercontent.com"):
+        errors.append("YT_CLIENT_ID galat hai. Ye '.apps.googleusercontent.com' par khatam hona chahiye")
+    if not sec:
+        errors.append("YT_CLIENT_SECRET khaali hai (GitHub secret set nahi hai)")
+    elif sec.endswith(".apps.googleusercontent.com"):
+        errors.append("YT_CLIENT_SECRET me Client ID daal diya hai. ID aur Secret ulte ho gaye")
+    elif not sec.startswith("GOCSPX-"):
+        warns.append("YT_CLIENT_SECRET aam taur par 'GOCSPX-' se shuru hota hai, ek baar check karo")
+    if not tok:
+        errors.append("YT_REFRESH_TOKEN khaali hai (GitHub secret set nahi hai)")
+    elif not tok.startswith("1//"):
+        warns.append("YT_REFRESH_TOKEN aam taur par '1//' se shuru hota hai, ek baar check karo")
+    for w in warns:
+        print("WARNING:", w)
+    if errors:
+        for e in errors:
+            print("SECRET ERROR:", e)
+        raise RuntimeError("YouTube secrets theek nahi hain, upar SECRET ERROR dekho")
+    print("YouTube secrets ka format theek lag raha hai.")
+
+
 def youtube_client():
     creds = Credentials(
         None,
@@ -192,6 +223,8 @@ def save_history(meta, video_id):
 
 
 def main():
+    if not DRY_RUN:
+        check_yt_secrets()  # galat chaabi ho to video banane se pehle hi pata chal jaye
     print("1/5 Script ban rahi hai...")
     meta = make_script()
     print("   ", meta["title"])
