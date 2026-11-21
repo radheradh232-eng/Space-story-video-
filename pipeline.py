@@ -63,13 +63,23 @@ Return ONLY JSON with keys:
         "generationConfig": {"responseMimeType": "application/json"},
     }
     r = None
+    last_err = None
     for attempt in range(5):
-        r = requests.post(url, json=body, timeout=90)
+        r = None
+        try:
+            r = requests.post(url, json=body, timeout=180)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            last_err = e
+            print(f"Gemini timeout/connection error ({e.__class__.__name__}), retry {attempt + 1}/5...")
+            time.sleep(10 * (attempt + 1))
+            continue
         if r.status_code in (429, 500, 503):
             print(f"Gemini busy ({r.status_code}), retry {attempt + 1}/5...")
             time.sleep(15 * (attempt + 1))
             continue
         break
+    if r is None:
+        raise last_err
     if not r.ok:
         print("GEMINI ERROR:", r.status_code, r.text)
     r.raise_for_status()
